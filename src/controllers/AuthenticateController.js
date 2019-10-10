@@ -1,7 +1,12 @@
 const User = require("../models/user")
+//importando o bcrypt para gerar o token de login
 const bcrypt = require('bcryptjs')
+//importando o arquivo aonde estamos gerando nosso token
 const Token = require('../config/Token')
+//importando o crypto para gerar o token de recuperação de senha
 const crypto = require('crypto')
+//importando a pasta de e-mails
+const mailer = require('../services/mailer')
 
 
 
@@ -68,12 +73,9 @@ module.exports = {
             //agora, vamos pegar a data, e setar o tempo que o token funciona
             //no caso vamos colocar para 1 hora
             const now = new Date()
-            now.getHours(now.getHours() + 1)
 
             //geramos os campos para guardar o token e a data de expiração no banco
             //agora vamos atualizar o banco, com os dados
-
-            console.log("Buscamos, e mostramos, falta atualizar")
             await User.findByIdAndUpdate(user.id, {
                 //para atualizar o banco, vamos procurar pelo id
                 //em seguida usar o $set para dizer quais são os campos queremos atualizar
@@ -83,10 +85,82 @@ module.exports = {
                 }
             })
 
-            console.log(token, now)
+            //aqui criaremos o exemplo do template que usaremos
+            const template = `<p>Olá <strong>${user.name}</strong>! <br>
+                Tudo bem com você?<br>
+                Vimos que você pediu para recuperar sua senha?<br>
+                Estamos aqui para te ajudar, utilize esse token <br>${token}<br><br>
+                Tchau Tchau!</p>`
+
+
+            //aqui vamos usar o nodemailer, q instalamos par enviar o e-mail para os parametros que escolhemos, depois de tod
+            //validação
+
+            //template: "auth/forgot_password",
+            await mailer.sendMail({
+                to: email,
+                from: "contato@empresadobairro.com.br",
+                html: template,
+                context: { token },
+            }, (err) => {
+                if (err) {
+                    return res.status(400).send({ error: "Cannot send forgot password email" })
+                }
+                res.send()
+            })
 
         } catch (err) {
+            console.log(err)
             return res.status(400).json({ error: "Failed on forgot password, try again" })
         }
+
+
+    },
+
+    async newPass(req, res) {
+        const { email, password, token } = req.body
+
+        try {
+
+            console.log(email, password, token)
+            const user = await User.findOne({ email }).select('+passwordResetToken passwordResetExpires')
+
+
+            if (!user) {
+                return res.status(400).json({ message: "User not Found!" })
+            }
+
+
+            if (token !== user.passwordResetToken) {
+                return res.status(400).json({ message: "Invalid Token" })
+            }
+
+
+            const now = new Date()
+
+            if (now < user.passwordResetExpires) {
+                return res.status(400).json({ message: "Time of token expired" })
+            }
+
+
+            if (password == null) {
+                return res.status(400).json({ message: "Password invalid" })
+            }
+
+
+            user.password = password
+
+            await user.save()
+
+            return res.json({ "ok": " sucess" })
+
+
+        } catch (err) {
+            return res.status(400).json({ error: "Failed in change password" })
+        }
+
+
+
+
     }
 }

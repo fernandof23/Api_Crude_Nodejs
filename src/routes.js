@@ -11,6 +11,8 @@ routes.post('/auth/authenticate', AuthenticateController.store)
 
 routes.post('/auth/forgot_password', AuthenticateController.forgot)
 
+routes.post('/auth/reset_password', AuthenticateController.newPass)
+
 
 //as rotas daqui para baixo precisaram estar logados para acessar
 //sera necessario conter o token de autenticação no headers da requisição
