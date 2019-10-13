@@ -76,7 +76,10 @@ module.exports = {
 
     async delete(req, res) {
         try {
+            const delete_task = await Project.findById(req.params.projectId)
+            await Task.deleteMany({ project: delete_task._id })
             const project = await Project.findByIdAndRemove(req.params.projectId)
+
             return res.json({ project })
         } catch (err) {
             return res.status(400).json({ error: "Impossible to delete this project, or project do not exists" })
