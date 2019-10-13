@@ -5,19 +5,38 @@ const User = require('../models/user')
 
 module.exports = {
     async show(req, res) {
-        res.json({ ok: true, message: "Listando todos", user: req.userId })
+        try {
+            const projects = await Project.find().populate(['user', 'tasks'])
+            return res.json({ projects })
+        } catch (err) {
+            return res.status(400).json({ error: "Impossible to show projects" })
+        }
     },
 
 
     async list(req, res) {
-        res.json({ ok: true, message: "Mostrando 1", user: req.userId })
+        try {
+            const project = await Project.findById(req.params.projectId).populate(['user', 'tasks'])
+            return res.json({ project })
+
+        } catch (err) {
+            return res.status(400).json({ error: "Impossible do Load a project" })
+        }
     },
 
     async store(req, res) {
         try {
-            const { tittle, description } = req.body
-            console.log(tittle, description, req.userId)
+            const { tittle, description, tasks } = req.body
             const project = await Project.create({ tittle: tittle, description: description, user: req.userId })
+
+            //adicionando agora as tasks separadamente
+            await Promise.all(tasks.map(async task => {
+                const projectTask = new Task({ tittle: task.tittle, assignedTo: task.assignedTo, project: project._id })
+                await projectTask.save()
+                project.tasks.push(projectTask)
+            }))
+
+            await project.save();
             return res.json({ project })
 
         } catch (err) {
@@ -28,11 +47,40 @@ module.exports = {
 
 
     async update(req, res) {
-        res.json({ ok: true, message: "Atualizado", user: req.userId })
+        try {
+            const { tittle, description, tasks } = req.body
+            const project = await Project.findByIdAndUpdate(req.params.projectId, {
+                tittle, description
+            }, { new: true })
+            project.tasks = [];
+
+
+            await Task.deleteMany({ project: project._id })
+
+            await Promise.all(tasks.map(async task => {
+                const projectTask = new Task({ tittle: task.tittle, assignedTo: task.assignedTo, project: project._id })
+                await projectTask.save()
+                project.tasks.push(projectTask)
+            }))
+
+
+
+            await project.save()
+
+            return res.json({ project })
+
+        } catch (err) {
+            return res.status(400).json({ error: "Impossible to update" })
+        }
     },
 
     async delete(req, res) {
-        res.json({ ok: true, message: "Deletado", user: req.userId })
+        try {
+            const project = await Project.findByIdAndRemove(req.params.projectId)
+            return res.json({ project })
+        } catch (err) {
+            return res.status(400).json({ error: "Impossible to delete this project, or project do not exists" })
+        }
     }
 
 
